@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Swift Ship Track</title>
+<style>
+:root{--bg:#eef3f6;--surface:#fff;--ink:#12303d;--muted:#5d7783;--line:#cfdce3;--accent:#0a7e8c;--accent-ink:#fff;--done:#1f8a5b;--warn:#c7771a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1b22;--surface:#162832;--ink:#e6f0f4;--muted:#93aab5;--line:#294451;--accent:#3cc1d1;--accent-ink:#06222a;--done:#4cc48c;--warn:#e3a04a}}
+:root[data-theme="dark"]{--bg:#0e1b22;--surface:#162832;--ink:#e6f0f4;--muted:#93aab5;--line:#294451;--accent:#3cc1d1;--accent-ink:#06222a;--done:#4cc48c;--warn:#e3a04a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,sans-serif;line-height:1.5}
+.wrap{max-width:860px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+h1{font-family:Georgia,"Times New Roman",serif;font-size:1.9rem;margin:0;letter-spacing:-.01em}
+.tabs{display:flex;gap:6px}
+.tabs button{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit}
+.tabs button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+input,select{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);min-width:0}
+input.grow{flex:1 1 220px}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;padding:10px 18px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer}
+.btn.alt{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.hint{color:var(--muted);font-size:.9rem;margin:8px 0 0}
+.route{display:flex;align-items:center;gap:10px;margin:16px 0 4px;font-weight:600}
+.route .bar{flex:1;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.route .fill{height:100%;background:var(--accent);transition:width .5s}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+.meta div span{display:block;color:var(--muted);font-size:.85rem}
+.badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.85rem;font-weight:600;border:1px solid currentColor}
+.badge.Delivered{color:var(--done)}.badge.Transit,.badge.Out{color:var(--accent)}.badge.Booked,.badge.Delayed{color:var(--warn)}
+ol.tl{list-style:none;margin:16px 0 0;padding:0 0 0 22px;border-left:2px solid var(--line)}
+ol.tl li{position:relative;padding:0 0 18px 14px}
+ol.tl li::before{content:"";position:absolute;left:-30px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--muted)}
+ol.tl li.on::before{background:var(--accent);border-color:var(--accent)}
+ol.tl li small{color:var(--muted);display:block}
+table{width:100%;border-collapse:collapse}
+.scroll{overflow-x:auto}
+th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:600;font-size:.9rem}
+.err{color:var(--warn);font-weight:600}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){.route .fill{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Swift Ship Track</h1>
+  <div class="tabs" role="group" aria-label="View">
+    <button id="tCust" aria-pressed="true">Track a parcel</button>
+    <button id="tAdm" aria-pressed="false">Admin</button>
+  </div>
+</header>
+
+<section id="cust">
+  <div class="panel">
+    <div class="row">
+      <input id="q" class="grow" placeholder="Enter tracking ID, e.g. SST1001" aria-label="Tracking ID">
+      <button class="btn" id="go">Track</button>
+    </div>
+    <p class="hint">Try SST1001 (in transit) or SST1002 (delivered).</p>
+    <p id="msg" class="err" role="alert"></p>
+  </div>
+  <div id="res" class="panel" hidden></div>
+</section>
+
+<section id="adm" hidden>
+  <div class="panel">
+    <h2 style="margin-top:0;font-size:1.2rem">Create shipment</h2>
+    <div class="row">
+      <input id="fn" placeholder="Sender name" aria-label="Sender name">
+      <input id="fo" placeholder="Origin city" aria-label="Origin">
+      <input id="fd" placeholder="Destination city" aria-label="Destination">
+      <input id="fw" type="number" min="0.1" step="0.1" placeholder="Weight (kg)" aria-label="Weight in kg">
+      <button class="btn" id="add">Create shipment</button>
+    </div>
+  </div>
+  <div class="panel">
+    <h2 style="margin-top:0;font-size:1.2rem">All shipments</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>ID</th><th>Route</th><th>Status</th><th>Update status</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+  </div>
+</section>
+</div>
+
+<script>
+const STAGES=["Booked","Picked up","In transit","Out for delivery","Delivered"];
+const KEY="sst-shipments-v1";
+const seed=[
+ {id:"SST1001",sender:"Ravi Traders",from:"Chennai",to:"Bengaluru",kg:4.2,stage:2,log:[[0,"Chennai","2026-10-01 09:10"],[1,"Chennai Hub","2026-10-01 15:40"],[2,"Hosur Transit Hub","2026-10-02 22:05"]]},
+ {id:"SST1002",sender:"Meena Crafts",from:"Madurai",to:"Chennai",kg:1.5,stage:4,log:[[0,"Madurai","2026-09-28 10:00"],[1,"Madurai Hub","2026-09-28 17:30"],[2,"Trichy Hub","2026-09-29 08:15"],[3,"Chennai Delivery Centre","2026-09-30 09:00"],[4,"Chennai","2026-09-30 13:20"]]}
+];
+let data;
+try{data=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!Array.isArray(data)||!data.length)data=seed;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const now=()=>{const d=new Date(),p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`};
+const badge=s=>{const k=s===4?"Delivered":s===3?"Out":s===2?"Transit":"Booked";return `<span class="badge ${k}">${STAGES[s]}</span>`};
+
+function show(view){
+  $("cust").hidden=view!=="c";$("adm").hidden=view!=="a";
+  $("tCust").setAttribute("aria-pressed",view==="c");$("tAdm").setAttribute("aria-pressed",view==="a");
+  if(view==="a")renderRows();
+}
+$("tCust").onclick=()=>show("c");$("tAdm").onclick=()=>show("a");
+
+function track(){
+  const id=$("q").value.trim().toUpperCase(),res=$("res");
+  $("msg").textContent="";res.hidden=true;
+  if(!id){$("msg").textContent="Enter a tracking ID to see your parcel.";return}
+  const s=data.find(x=>x.id===id);
+  if(!s){$("msg").textContent="No shipment found for "+id+". Check the ID and try again.";return}
+  const pct=s.stage/(STAGES.length-1)*100;
+  const events=[...s.log].reverse().map(e=>`<li class="on"><strong>${STAGES[e[0]]}</strong><small>${esc(e[1])} &middot; ${esc(e[2])}</small></li>`).join("");
+  const pending=STAGES.slice(s.stage+1).reverse().map(n=>`<li><span style="color:var(--muted)">${n}</span></li>`).join("");
+  res.innerHTML=`<div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">${esc(s.id)}</h2>${badge(s.stage)}</div>
+  <div class="route"><span>${esc(s.from)}</span><div class="bar"><div class="fill" style="width:${pct}%"></div></div><span>${esc(s.to)}</span></div>
+  <div class="meta"><div><span>Sender</span>${esc(s.sender)}</div><div><span>Weight</span>${esc(s.kg)} kg</div><div><span>Last update</span>${esc(s.log[s.log.length-1][2])}</div></div>
+  <ol class="tl">${pending}${events}</ol>`;
+  res.hidden=false;
+}
+$("go").onclick=track;
+$("q").addEventListener("keydown",e=>{if(e.key==="Enter")track()});
+
+function renderRows(){
+  $("rows").innerHTML=data.map(s=>`<tr><td><strong>${esc(s.id)}</strong></td><td>${esc(s.from)} to ${esc(s.to)}</td><td>${badge(s.stage)}</td>
+  <td><select data-id="${esc(s.id)}" aria-label="Update status for ${esc(s.id)}">${STAGES.map((n,i)=>`<option value="${i}" ${i===s.stage?"selected":""}>${n}</option>`).join("")}</select></td></tr>`).join("");
+  document.querySelectorAll("#rows select").forEach(sel=>sel.onchange=()=>{
+    const s=data.find(x=>x.id===sel.dataset.id);s.stage=+sel.value;
+    s.log.push([s.stage,s.stage===4?s.to:s.stage===0?s.from:"In network",now()]);
+    save();renderRows();
+  });
+}
+$("add").onclick=()=>{
+  const sender=$("fn").value.trim(),from=$("fo").value.trim(),to=$("fd").value.trim(),kg=parseFloat($("fw").value);
+  if(!sender||!from||!to||!(kg>0)){alert("Fill in sender, origin, destination and a weight above 0.");return}
+  const n=1000+data.length+1;
+  data.push({id:"SST"+n,sender,from,to,kg,stage:0,log:[[0,from,now()]]});
+  save();["fn","fo","fd","fw"].forEach(i=>$(i).value="");renderRows();
+};
+</script>
+</body>
+</html>
